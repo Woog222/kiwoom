@@ -2,3 +2,6 @@ data/*
 result/*
 .idea/*
 */__pycache__/
+
+!data/.gitkeep
+!result/.gitkeep
