@@ -1,6 +1,7 @@
 from Kiwoom.KApp import KApp
 from App.App import App
 from tool.tools import *
+import config.config as CONFIG
 
 class Stock:
 
@@ -38,12 +39,17 @@ class Stock:
         """
             state / current_price / bottom / stoploss / assigned_amount  
         """
-        sb = [self.state, 
-              self.app.get_current_price(code=self.code, dynamic=True), 
-              self.bottom,
-              self.stop_loss]
+        sb = [self.name,
+            str(self.state), 
+            str(self.app.get_current_price(code=self.code)), 
+            str(self.bottom),
+            str(self.get_stoploss()),
+            str(self.assigned_amount),
+            CONFIG.SEP.join([str(order) for order in self.buy_orders]),
+            CONFIG.SEP.join([str(order) for order in self.sell_orders])
+        ]
         
-        return 
+        return CONFIG.SEP.join(sb)
 
     def get_code(self): return self.code
     def get_name(self): return self.name
@@ -51,6 +57,7 @@ class Stock:
     def get_bottom(self): return self.bottom
     def get_shareHeld(self): return self.shareHeld
     def get_assigned_amount(self): return self.assigned_amount
+    def get_stoploss(self): return self.spots[f"stoploss{self.state}"]
 
     def update(self):
         # shareHeld
@@ -83,36 +90,39 @@ class Stock:
         self.app.sell(code=self.code, limit=False, quantity = self.shareHeld)
         self.shareHeld = 0
 
-    def start(self):
-        # 1. open_price
-        self.open_price = self.app.get_open_price(code=self.code)
+    def start(self, first = True):
 
-        # 2. calculating spots (buy, stoploss)
-        self.spots = finding_spots(day_chart=self.day_chart, avg_prices=self.avg_prices, open_price=self.open_price, supRes=self.supRes)
+        if first:
+            # 1. open_price
+            self.open_price = self.app.get_open_price(code=self.code)
+
+            # 2. calculating spots (buy, stoploss)
+            self.spots = finding_spots(day_chart=self.day_chart, avg_prices=self.avg_prices, open_price=self.open_price, supRes=self.supRes)
 
         # 3. make buy order
+
         if self.spots['buy1'] == -1:
             if self.open_price > self.spots['buy2']:
-                err_code, self.buy_ord_no = self.app.buy(code=self.code, limit=True, price=self.spots['buy2'], 
+                err_code = self.app.buy(code=self.code, limit=True, price=self.spots['buy2'], 
                                                          quantity= self.assigned_amount//self.spots['buy2'])
                 self.state = 2
             elif self.open_price > self.spots['buy3']:
-                err_code, self.buy_ord_no = self.app.buy(code=self.code, limit=True, price=self.spots['buy3'], 
+                err_code = self.app.buy(code=self.code, limit=True, price=self.spots['buy3'], 
                                                          quantity= self.assigned_amount//self.spots['buy3'])
                 self.state = 3
             return
-        if self.open_price > self.spots['buy1']:
-            err_code, self.buy_ord_no = self.app.buy(code=self.code, limit=True, price=self.spots['buy1'], 
-                                                         quantity= self.assigned_amount//self.spots['buy1'])
-            self.state = 1
-        elif self.open_price > self.spots['buy2']:
-            err_code, self.buy_ord_no = self.app.buy(code=self.code, limit=True, price=self.spots['buy2'], 
-                                                         quantity= self.assigned_amount//self.spots['buy2'])
-            self.state = 2
-        elif self.open_price > self.spots['buy3']:
-            err_code, self.buy_ord_no = self.app.buy(code=self.code, limit=True, price=self.spots['buy3'], 
-                                                         quantity= self.assigned_amount//self.spots['buy3'])
-            self.state = 3
+        # if self.open_price > self.spots['buy1']:
+        #     err_code = self.app.buy(code=self.code, limit=True, price=self.spots['buy1'], 
+        #                                                  quantity= self.assigned_amount//self.spots['buy1'])
+        #     self.state = 1
+        # elif self.open_price > self.spots['buy2']:
+        #     err_code = self.app.buy(code=self.code, limit=True, price=self.spots['buy2'], 
+        #                                                  quantity= self.assigned_amount//self.spots['buy2'])
+        #     self.state = 2
+        # elif self.open_price > self.spots['buy3']:
+        #     err_code = self.app.buy(code=self.code, limit=True, price=self.spots['buy3'], 
+        #                                                  quantity= self.assigned_amount//self.spots['buy3'])
+        #     self.state = 3
             
 
 
@@ -127,5 +137,7 @@ class Stock:
             """
                 todo!!!!!!!!
             """
+
+    def update_state(self):
 
     

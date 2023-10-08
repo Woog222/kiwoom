@@ -12,6 +12,8 @@ logging.basicConfig(
 # Create a logger object
 logger = logging.getLogger('my_logger')
 
+SEP = '|'
+
 BUY = 1
 SELL = 2
 BUY_CANCEL = 3

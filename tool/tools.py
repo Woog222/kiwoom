@@ -67,10 +67,16 @@ def round_tick_size(price:int)->int:
         else              : return 20000
 
 def cal_price(price:int):
+    """
+        return the nearest hoga
+    """
     tick = tick_size(price)
     return price - (price % tick)
 
 def cal_round_figure(price:int, buy:bool):
+    """
+    
+    """
 
     # 1. round tick?
     round_tick = round_tick_size(price=price)
@@ -84,7 +90,7 @@ def cal_round_figure(price:int, buy:bool):
         ret += round_tick if buy else (-round_tick)
     
     # 3. buy or sell
-    return ret + tick_size(ret) if buy else ret
+    return int(ret + tick_size(ret) if buy else ret)
 
 def avg_price(day_chart:pd.DataFrame, day:int=5):
     """
@@ -132,7 +138,7 @@ def finding_spots(day_chart:pd.DataFrame, avg_prices:dict, open_price:int,  supR
             break
     if ret['buy2'] == init_value: ret['buy2'] = avg_prices[7]
 
-    ret['stoploss2'] = cal_round_figure(avg_prices[10])
+    ret['stoploss2'] = cal_round_figure(avg_prices[10], buy=False)
 
     # method 3
     for cand in meaninful_spots:
@@ -142,7 +148,7 @@ def finding_spots(day_chart:pd.DataFrame, avg_prices:dict, open_price:int,  supR
             break
     if ret['buy3'] == init_value: ret['buy3'] = avg_prices[15]
     
-    ret['stoploss3'] = cal_round_figure(avg_prices[20])
+    ret['stoploss3'] = cal_round_figure(avg_prices[20], buy=False)
 
 
     # return 

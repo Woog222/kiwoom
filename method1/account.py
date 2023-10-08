@@ -22,10 +22,8 @@ class Account:
             code, supRes1, supRes2, supRes3, assigned = f.readline().split()    
             self.stocks[code] = Stock(app=app, code=code, assigned_amount=int(assigned), 
                                       supRes = {1:int(supRes1), 2:int(supRes2), 3:int(supRes3)})
-            
-            cur_price = self.app.get_current_price(code)
-            self.app.price_monitor[code] = {'cur_price' : cur_price, 'min_price':cur_price}
-            
+        
+
         self.app.subscribe(code_list=self.stocks.keys())
 
 
@@ -49,18 +47,20 @@ class Account:
         if order_no in stock.sell_orders: stock.sell_orders.pop(order_no)
 
 
-    def start(self):
-        for stock in self.stocks.items(): stock.start()
+    def start(self, first=True):
+        for stock in self.stocks.values(): stock.start(first=first)
     """
         Monitoring
     """
     def periodic_bottom_update(self):
-        for stock in self.stocks.items():
+        for stock in self.stocks.values():
             stock.update_selling_order()
 
     def price_check(self):
         for stock in self.stocks.values():
-            stock.check_price(cur_price = self.app.get_bottom(code = stock.code))
+            stock.check_price(cur_price = self.app.get_current(code = stock.code))
+
+    def update_stocks(self):
 
 
 

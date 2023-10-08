@@ -12,7 +12,7 @@ class KiwoomProxy():
                  method_cqueue, method_dqueue,
                  tr_cqueue, tr_dqueue,
                  order_cqueue, order_dqueue,
-                 real_cqueue, real_dqueues,
+                 real_cqueue, real_dqueue,
                  cond_cqueue, cond_dqueue,
                  tr_cond_dqueue, real_cond_dqueue,
                  chejan_dqueue,
@@ -32,7 +32,7 @@ class KiwoomProxy():
 
         # real queue
         self.real_cqueue      = real_cqueue
-        self.real_dqueues     = real_dqueues
+        self.real_dqueue     = real_dqueue
 
         # condition queue
         self.cond_cqueue      = cond_cqueue         # tr/real condition command queue
@@ -51,7 +51,7 @@ class KiwoomProxy():
 
         self.kiwoom = Kiwoom(
             tr_dqueue           = self.tr_dqueue,
-            real_dqueues        = self.real_dqueues,
+            real_dqueue        = self.real_dqueue,
             tr_cond_dqueue      = self.tr_cond_dqueue,
             real_cond_dqueue    = self.real_cond_dqueue,
             chejan_dqueue       = self.chejan_dqueue,

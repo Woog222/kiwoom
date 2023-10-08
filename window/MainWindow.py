@@ -8,6 +8,7 @@ from tool.tools import *
 from method1.account import Account
 from App.App import App
 from method1.account import Account
+from method1.monitor import Monitor
 
 form_class = uic.loadUiType(CONFIG.WINDOW_UI_DIR)[0]
 
@@ -18,10 +19,12 @@ class MainWindow(QMainWindow, form_class):
         self.setupUi(self)
         self.app = app
         self.account = account
+        self.monitor = Monitor(app=self.app, account=self.account, wait=False)
+        self.monitor.start()
 
         # timer
         self.timer = QTimer(self)
-        self.timer.start(1000)
+        self.timer.start(3000)
 
         # handler setting
         self.set_handler()
@@ -31,7 +34,6 @@ class MainWindow(QMainWindow, form_class):
 
     def set_handler(self):
         self.timer.timeout.connect(self.timeout)
-        self.test_button.clicked.connect(self.show_stock_eval)
         self.check_button.clicked.connect(self.show_balance)
 
     """
@@ -51,7 +53,7 @@ class MainWindow(QMainWindow, form_class):
             shareHeld = stock.get_shareHeld()
             assigned_amount = stock.get_assigned_amount()
 
-            for col, data in enumerate([name, cur_price, buy_price, bottom, shareHeld, assigned_amount]):
+            for col, data in enumerate(str(stock).split(CONFIG.SEP)):
                 try: item = QTableWidgetItem(number_format(data))
                 except: item = QTableWidgetItem(str(data))
                 item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
@@ -102,15 +104,7 @@ class MainWindow(QMainWindow, form_class):
         self.show_stock_eval()
         self.show_interest_stocks()
 
-    def test_handler(self):
-        target = self.account.stocks[0]
-
-        target.buy()
-
     def timeout(self):
-        current_time = QTime.currentTime()
-        text_time = current_time.toString("hh:mm:ss")
-        time_msg = "current time : " + text_time
+        if self.real_time_button.isChecked():
+            self.show_balance()
 
-        state_msg = "?"
-        self.statusbar.showMessage(state_msg + " | " + time_msg)

@@ -16,7 +16,7 @@ class App(metaclass = ABCMeta):
     def sell(self, code:str, limit:bool, price:int, quantity:int, ord_no:str = "")-> (str, str): pass
 
     @abstractmethod
-    def sell_cancel(self, code:str, quantity:int, ord_no:str)-> (str, str): pass
+    def sell_cancle(self, code:str, quantity:int, ord_no:str)-> (str, str): pass
 
     """
         connection
@@ -55,10 +55,7 @@ class App(metaclass = ABCMeta):
     def get_stock_name(self, code:str) -> str:pass
 
     @abstractmethod
-    def get_bottom(self, code:str) -> int: pass
-
-    @abstractmethod
-    def get_current_price(self, code:str, dynamic:bool=False) -> int: pass
+    def get_current_price(self, code:str) -> int: pass
 
     @abstractmethod
     def get_open_price(self, code:str) -> int:pass

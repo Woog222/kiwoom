@@ -12,12 +12,17 @@ class Order:
         self.price = price
         self.quantity = quantity
 
+    def __str__(self):
+        return f"{'BUY' if self.order_type==CONFIG.BUY else 'SELL'} ({self.price}, {self.quantity})"
+
     def cancel(self, quantity:int = -1):
         if quantity < 0 or quantity > self.quantity:
             quantity = self.quantity # cancel all
         
         if self.order_type == CONFIG.BUY:
             self.app.buy_cancle(code=self.code, quantity=quantity, ord_no = self.order_no)
+        elif self.order_type == CONFIG.SELL:
+            self.app.sell_cancle(code=self.code, quantity=quantity, ord_no = self.order_no )
 
         
 

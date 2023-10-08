@@ -14,7 +14,7 @@ class Kiwoom:
     def __init__(self,
                  login=True,
                  tr_dqueue=None,
-                 real_dqueues=None,
+                 real_dqueue=None,
                  tr_cond_dqueue=None,
                  real_cond_dqueue=None,
                  chejan_dqueue=None,
@@ -26,21 +26,15 @@ class Kiwoom:
         # queues
         self.order_dqueue       = order_dqueue
         self.tr_dqueue          = tr_dqueue          # tr data queue
-        self.real_dqueues       = real_dqueues       # real data queue list
+        self.real_dqueue        = real_dqueue       # real data queue list
         self.tr_cond_dqueue     = tr_cond_dqueue
         self.real_cond_dqueue   = real_cond_dqueue
         self.chejan_dqueue      = chejan_dqueue
 
-        # sharing 
+        # sharing  {code : price}
         self.price_monitor      = price_monitor 
-        """
-        { code : {
-            cur_price : 12500,
-            min_price : 12100
-            }
-        }
-        """
 
+        # 
         self.connected          = False              # for login event
         self.received           = False              # for tr event
         self.tr_items           = None               # tr input/output items
@@ -162,7 +156,6 @@ class Kiwoom:
         #     return
 
         if trcode in CODE.ORDER_CODES: return
-
         """
             Dequeue used
         """
@@ -213,7 +206,8 @@ class Kiwoom:
 
 
     def OnReceiveMsg(self, screen, rqname, trcode, msg):
-        pass
+        CONFIG.logger.info(msg)
+        return
 
     def OnReceiveChejanData(self, gubun, item_cnt, fid_list):
         """주문접수, 체결, 잔고 변경시 이벤트가 발생
@@ -250,14 +244,15 @@ class Kiwoom:
         """
         if rtype=="주식체결":
             cur_price = abs(int(self.GetCommRealData(code, fid=10)))
-            data = self.price_monitor[code]
-            data['cur_price'] = cur_price
-            data['min_price'] = min(cur_price, data['min_price'])
+            try:
+                self.price_monitor[code] = cur_price
+            except:
+                CONFIG.logger.info(f"{code} price monitor not yet made")
             return
         
         if rtype == "장시작시간":
             gubun = self.GetCommRealData(code=code, fid=215)
-            self.real_dqueues.put(gubun)
+            self.real_dqueue.put(gubun)
             return 
 
         # get real data
@@ -268,7 +263,7 @@ class Kiwoom:
                 real_data[fid] = val
 
             # put real data to the queue
-            self.real_dqueues.put(real_data)
+            self.real_dqueue.put(real_data)
 
     def _set_signals_slots(self):
         self.ocx.OnReceiveTrData.connect(self.OnReceiveTrData)
@@ -453,7 +448,6 @@ class Kiwoom:
         :param code: 종목코드
         :return: 전일가
         """
-        print(code)
         data = self.ocx.dynamicCall("GetMasterLastPrice(QString)", code)
         return int(data)
 

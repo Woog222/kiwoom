@@ -101,17 +101,17 @@ class KApp(App):
             
         
     def sell(self, code: str, limit: bool, price: int, quantity: int, ord_no: str = "") -> (str, str):
-        return self.put_order(make_param(kiwoom = self.kiwoom, order_type=CONFIG.BUY, code=code, accno=self.accno, 
+        return self.put_order(make_param(order_type=CONFIG.SELL, code=code, accno=self.accno, 
                           quantity=quantity, limit=limit, price=price, order_no=ord_no))
 
         
     def buy_cancle(self, code: str, quantity: int, ord_no: str) -> (str, str):
-        return self.put_order(make_param(kiwoom = self.kiwoom, order_type=CONFIG.BUY, code=code, accno=self.accno, 
+        return self.put_order(make_param(order_type=CONFIG.BUY_CANCLE, code=code, accno=self.accno, 
                           quantity=quantity, limit=True, price=0, order_no=ord_no))
 
     
-    def sell_cancel(self, code: str, quantity: int, ord_no: str) -> (str, str):
-        return self.put_order(make_param(kiwoom = self.kiwoom, order_type=CONFIG.BUY, code=code, accno=self.accno, 
+    def sell_cancle(self, code: str, quantity: int, ord_no: str) -> (str, str):
+        return self.put_order(make_param(order_type=CONFIG.SELL_CANCLE, code=code, accno=self.accno, 
                           quantity=quantity, limit=True, price=0, order_no=ord_no))
 
     
@@ -131,16 +131,8 @@ class KApp(App):
         cur_price = df['시가'][0]
         return abs(int(cur_price))
     
-    def get_bottom(self, code:str) -> int:
-        return self.price_monitor[code]['min_price']
-    
-    def get_current_price(self, code: str, dynamic=False) -> int:
-        if dynamic: return self.price_monitor[code]['current_price']
-
-        self.put_method(('GetMasterLastPrice', code))
-        while self.method_dqueue.empty(): pass
-        ret = self.get_method()
-        return int(ret)
+    def get_current_price(self, code: str) -> int:
+        if code in self.price_monitor: return self.price_monitor[code]
 
         self.put_tr(cmd = make_tr_param(
             trcode  = CODE.TR_CURRENT_PRICE,
@@ -303,6 +295,9 @@ class KApp(App):
         return df
     
     def subscribe(self, code_list:[str]):
+
+        for code in code_list: 
+            self.price_monitor[code] = self.get_current_price(code)
         self.put_real(cmd = make_real_param(
             real_type='주식체결',
             subscribe=True,
@@ -366,6 +361,9 @@ class KApp(App):
             return False
         else:
             return self.chejan_dqueue.get()
+        
+    def chejan_arrived(self):
+        return False if self.chejan_dqueue.empty() else True
 
 
 
