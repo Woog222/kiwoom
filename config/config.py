@@ -4,7 +4,9 @@ from datetime import datetime
 
 ############# CONFIG ####################
 
-WAIT = False # wait for market to open
+# True  : 08:30 ~ 09:00
+# False : market time
+WAIT = True # wait for market to open
 
 
 ########################################
