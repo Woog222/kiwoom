@@ -11,7 +11,7 @@ SCREEN_NOS = {
 
 def make_param(order_type, code:str, accno:str, quantity:int, limit:bool, price:int = 0, order_no:str = ""):
     """
-        proxy : KiwoomProxy
+        make order param
     """
     
     return  {

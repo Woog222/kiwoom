@@ -52,6 +52,26 @@ class App(metaclass = ABCMeta):
         info
     """
     @abstractmethod
+    def is_market_open(self)-> bool: 
+        """
+            whether market is available or ,,
+        """
+        pass
+    @abstractmethod
+    def is_market_close(self)->bool:
+        """
+            when your program have to stop
+        """
+        pass
+
+    @abstractmethod
+    def get_chejan(self):
+        """
+            if received, return chejan data with agreed format
+            if not, return None
+        """
+        pass
+    @abstractmethod
     def get_stock_name(self, code:str) -> str:pass
 
     @abstractmethod
@@ -67,7 +87,17 @@ class App(metaclass = ABCMeta):
     def get_minute_chart(self, code:str, tick_size:int, columns:list, size:int) -> pd.DataFrame: pass
 
     @abstractmethod
-    def subscribe(self, code_list:[str]): pass
+    def subscribe(self, code_list:[str]): 
+        """
+            price will be updated realtime through price_monitor
+        """
+        pass
 
+    @abstractmethod
+    def unsubscribe(self, code_list:[str]): 
+        """
+            price won't be updated anymore through price_monitor
+        """
+        pass
 
 

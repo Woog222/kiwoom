@@ -1,6 +1,14 @@
 import os, logging
 from datetime import datetime
 
+
+############# CONFIG ####################
+
+WAIT = False # wait for market to open
+
+
+########################################
+
 # Configure the logging settings
 logging.basicConfig(
     level=logging.DEBUG,  # Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -11,7 +19,21 @@ logging.basicConfig(
 
 # Create a logger object
 logger = logging.getLogger('my_logger')
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)  # Set the desired logging level
+logger.addHandler(console_handler)
 
+SETTING_DTYPE = {
+    'code' : str,
+    'state' : str,
+    'stoploss' : int,
+    'body' : str,
+    'supRes' : str,
+    'quan' : int,
+    'assigned_quan' : int,
+    'sold' : int,
+    'order' : str
+}
 SEP = '|'
 
 BUY = 1
@@ -59,10 +81,11 @@ LOGIN_METHOD = "CommConnect()"
 """
 
 WINDOW_UI_DIR = os.path.join("data", "window.ui")
-SETTING_DIR = os.path.join("data/setting.txt")
+SETTING_DIR = os.path.join("data", "setting.csv")
 
 """
     MONEY
 """
 DEPOSIT_RESERVE = 100000
+
 

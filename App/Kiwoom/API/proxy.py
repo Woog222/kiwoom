@@ -1,8 +1,8 @@
-import sys
+import sys, time, pythoncom
 from PyQt5.QtWidgets import QApplication
-import pythoncom
-from Kiwoom.API.kiwoom import Kiwoom
+from App.Kiwoom.API.kiwoom import Kiwoom
 import multiprocessing as mp
+import config.code as CODE
 
 
 class KiwoomProxy():
@@ -97,20 +97,18 @@ class KiwoomProxy():
             if not self.order_cqueue.empty():
                 order_cmd = self.order_cqueue.get()
 
-                # parameters
-                rqname      = order_cmd['rqname']
-                screen      = order_cmd['screen']
-                acc_no      = order_cmd['acc_no']
-                order_type  = order_cmd['order_type']
-                code        = order_cmd['code']
-                quantity    = order_cmd['quantity']
-                price       = order_cmd['price']
-                hoga_gb     = order_cmd['hoga_gb']
-                order_no    = order_cmd['order_no']
-
-                # request api
-                temp = self.kiwoom.SendOrder(rqname, screen, acc_no, order_type, code, quantity, price, hoga_gb, order_no)
-
+                err_code = self.kiwoom.SendOrder(
+                    rqname=order_cmd['rqname'],
+                    screen=order_cmd['screen'],
+                    accno=order_cmd['acc_no'],
+                    order_type=order_cmd['order_type'],
+                    code=order_cmd['code'],
+                    quantity=order_cmd['quantity'],
+                    price=order_cmd['price'],
+                    hoga=order_cmd['hoga_gb'],
+                    order_no=order_cmd['order_no']
+                )
+                print(f"order error code : {err_code}")
 
             # real
             if not self.real_cqueue.empty():
@@ -118,7 +116,7 @@ class KiwoomProxy():
 
                 # parameters
                 func_name = real_cmd['func_name']   # SetRealReg/DisConnectRealData
-                screen    = real_cmd.get('screen', "7999")
+                screen    = real_cmd.get('screen', CODE.SCR_REAL_PRICE)
 
                 if func_name == "SetRealReg":
                     code_list = real_cmd['code_list']   # ["005930", "000660"]
@@ -132,11 +130,9 @@ class KiwoomProxy():
                         else:
                             self.kiwoom.real_fid[ticker] = \
                                 list(set(self.kiwoom.real_fid[ticker] + fid_list))
-
+                    self.kiwoom.DisconnectRealData(screen = screen)
                     self.kiwoom.SetRealReg(screen=screen, code_list=code_list,
                         fid_list=fid_list, opt_type = str(opt_type))
-                elif func_name == "DisConnectRealData":
-                    self.kiwoom.DisconnectRealData(screen)
                 else:
                     print("invalid func_name")
                     """ log """
@@ -166,6 +162,7 @@ class KiwoomProxy():
                         self.kiwoom.SendConditionStop(screen, cond_name, index)
 
             pythoncom.PumpWaitingMessages()
+            time.sleep(0.2)
 
 
 

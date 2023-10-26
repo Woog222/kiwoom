@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 import pythoncom
 import datetime
-from Kiwoom.API import parser
+from App.Kiwoom.API import parser
 import pandas as pd
 import config.config as CONFIG
 import config.code as CODE
@@ -149,13 +149,11 @@ class Kiwoom:
         """
             ORDER
         """
-        # if trcode in CODE.ORDER_CODES:
-        #     order_no = self.GetCommData(trcode, "", 0, "")
-        #     self.received = True
-        #     self.tr_data = order_no
-        #     return
-
-        if trcode in CODE.ORDER_CODES: return
+        if trcode in CODE.ORDER_CODES: 
+            return
+            # order_no = self.GetCommData(trcode, "", 0, "")
+            # print(order_no, end="tr\n")
+            # return
         """
             Dequeue used
         """
@@ -163,6 +161,9 @@ class Kiwoom:
             items = self.tr_output[trcode]
             data = self.get_data(trcode, rqname, items)
             remain = True if next == '2' else False
+
+            # print(f"-----------------------------to dqueue {'remain' if remain else 'done'} ------------------------ \n\t")
+            # print(data)
             self.tr_dqueue.put((data, remain))
             return
         
@@ -206,7 +207,6 @@ class Kiwoom:
 
 
     def OnReceiveMsg(self, screen, rqname, trcode, msg):
-        CONFIG.logger.info(msg)
         return
 
     def OnReceiveChejanData(self, gubun, item_cnt, fid_list):
@@ -219,18 +219,25 @@ class Kiwoom:
 
         """
         if self.chejan_dqueue is None: return
-        fid_list = fid_list.split(';')
-
+        #fid_list = fid_list.split(';')
         if gubun == "0":
+
+            status = self.GetChejanData("913").strip() # "접수" "체결" "확인"
             ret = {}
             ret["order_no"] = self.GetChejanData("9203").strip()
-            ret["code"] = self.GetChejanData("9201").strip()
-            ret["status"] = self.GetChejanData("913").strip() # "접수" or "체결"
-            ret["order_type"] = CONFIG.BUY if self.GetChejanData("905").strip() =="+" else CONFIG.SELL
+            ret["code"] = self.GetChejanData("9001").strip().strip('A') # "A005930"
+            ret["status"] = self.GetChejanData("913").strip() # "접수" or "체결" or "확인"
+            ret["order_type"] = self.GetChejanData("905").strip() # "+매수" "매수취소"
             ret["quan"] = int(self.GetChejanData("900").strip())
             ret["remain_quan"] = int(self.GetChejanData("902").strip())
             ret["price"] = int(self.GetChejanData("901").strip())
-            ret["limit"] = True if self.GetChejanData("906").strip() == "시장가" else False
+            ret["origin_order_no"] = self.GetChejanData("904").strip()
+            ret["limit"] = self.GetChejanData("906").strip()=="보통" # "보통", "시장가"
+
+            deal_quan = self.GetChejanData("911").strip()
+            ret["deal_quan"] = 0 if deal_quan == '' else int(deal_quan)
+
+            print(f"""{ret['order_no']}({ret['origin_order_no']}), code({ret['code']}) : {ret["limit"]}{ret['order_type']} {ret['status']},  ({ret['quan']}, {ret['deal_quan']}, {ret['remain_quan']} left), {ret['price']} won. (chejan arrived)""")
             self.chejan_dqueue.put(ret)
 
 
@@ -242,16 +249,17 @@ class Kiwoom:
             rtype (str): 리얼타입 (주식시세, 주식체결, ...)
             data (str): 실시간 데이터 전문
         """
-        if rtype=="주식체결":
-            cur_price = abs(int(self.GetCommRealData(code, fid=10)))
-            try:
+        if rtype=="주식우선호가":
+            cur_price = abs(int(self.GetCommRealData(code, fid=27)))
+
+            if code in self.price_monitor: 
                 self.price_monitor[code] = cur_price
-            except:
-                CONFIG.logger.info(f"{code} price monitor not yet made")
             return
         
         if rtype == "장시작시간":
             gubun = self.GetCommRealData(code=code, fid=215)
+            print(f"market open real data received, gubun : {gubun}")
+
             self.real_dqueue.put(gubun)
             return 
 
@@ -330,7 +338,7 @@ class Kiwoom:
                      20: 지정가FOK, 23: 시장가FOK, 26: 최유리FOK,
                      61: 장전시간외종가, 62: 시간외단일가, 81: 장후시간외종가
         :param order_no: 원주문번호로 신규 주문시 공백, 정정이나 취소 주문시에는 원주문번호를 입력
-        :return: err_code, order_no
+        :return: err_code
         """
         self.received = False
         return self.ocx.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",

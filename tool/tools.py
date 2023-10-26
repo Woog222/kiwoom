@@ -33,14 +33,14 @@ def divide_three(num:int)->list:
     assert q*3+r == num
     return [q,q,r+q]
 
-def cal_meaningful_spot(open_price:int, last_price:int) -> list:
+def cal_body(open_price:int, last_price:int) -> list:
     """
         previous day open and last_price
     """
-    shoulder = (open_price + 3*last_price)/4
-    waist = (open_price+ last_price)/2
-    knee = (3*open_price + last_price)/4
-    return [last_price, open_price, waist, shoulder, knee]
+    shoulder = int( (open_price + 3*last_price)/4 )
+    waist = int( (open_price+ last_price)/2 )
+    knee = int( (3*open_price + last_price)/4 )
+    return list(map(cal_price, [last_price, open_price, waist, shoulder, knee]))
 
 def tick_size(price:int)->int:
 
@@ -71,7 +71,10 @@ def cal_price(price:int):
         return the nearest hoga
     """
     tick = tick_size(price)
-    return price - (price % tick)
+    r = price % tick
+    left = price - r
+    right = left + tick
+    return left if abs(price-left) <= abs(price-right) else right 
 
 def cal_round_figure(price:int, buy:bool):
     """
@@ -92,7 +95,7 @@ def cal_round_figure(price:int, buy:bool):
     # 3. buy or sell
     return int(ret + tick_size(ret) if buy else ret)
 
-def avg_price(day_chart:pd.DataFrame, day:int=5):
+def cal_avg_price(day_chart:pd.DataFrame, day:int=5):
     """
         only last_price column needed
         default index needed
@@ -117,7 +120,7 @@ def finding_spots(day_chart:pd.DataFrame, avg_prices:dict, open_price:int,  supR
     prev_open_price = day_chart.loc[0,'open_price']
     prev_last_price = day_chart.loc[0,'last_price']
     
-    meaninful_spots = cal_meaningful_spot(open_price=prev_open_price, last_price=prev_last_price)
+    meaninful_spots = cal_body(open_price=prev_open_price, last_price=prev_last_price)
 
     # method 1
     if prev_last_price < open_price: ret['buy1'] = prev_last_price
@@ -153,3 +156,5 @@ def finding_spots(day_chart:pd.DataFrame, avg_prices:dict, open_price:int,  supR
 
     # return 
     return ret
+
+

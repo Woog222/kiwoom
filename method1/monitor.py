@@ -3,7 +3,7 @@ import threading
 from typing import Any
 from App.App import App
 from method1.account import Account
-import time
+import time, datetime
 import config.config as CONFIG
 import config.code as CODE
 from method1.order import Order
@@ -11,17 +11,18 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-class Monitor(QThread):
+class Monitor(threading.Thread):
 
-    stoploss_signal = pyqtSignal(str)
-
-    def __init__(self, app:App, account:Account, sleep_time = 2, wait=True):
-        super().__init__()
+    def __init__(self, app:App, account:Account, sleep_time =5, wait=CONFIG.WAIT):
+        super().__init__(daemon=True)
         self.app = app
         self.account = account
         self.running = True
         self.wait = wait
+        self.sleep_time = sleep_time
         self.skip=False
+
+        self.noon = False
 
     def pause(self):
         self.running = False
@@ -34,60 +35,115 @@ class Monitor(QThread):
 
     def run(self):
 
-        if not self.skip and self.wait:
-            while not self.app.real_arrived():
-                gubun = self.get_real()
-                if gubun == CODE.MARKET_OPEN:
-                    self.account_start()
-                    break
+            
+        if self.wait: 
+            CONFIG.logger.info("waiting market to open")
+            while not self.app.is_market_open(): time.sleep(1)
+            CONFIG.logger.info("market open!")
+            self.account.start()
         elif not self.skip:
             self.account.start()    
-            print("stated")
 
-        cnt = 0
+        """
+            Task
+        """
+        CONFIG.logger.info("monitoring started.")
         while self.running:
-            cnt = (cnt + 1)%50
+           
 
-            # real data? (market start_time)
-            if self.app.real_arrived():
+            """
+                market closed?
+            """
+            if self.app.is_market_close():
+                CONFIG.logger.info(f"market closed. terminate program")
+                self.account.terminate()
+                self.app.terminate()
+                break
 
-                gubun =  self.GetCommRealData(code, 215)
-                if gubun == CODE.MARKET_CLOSE_SOON:
-                    print(gubun, end = " market will be closed soon")
-
-            # price check
+            remain=False
             for stock in self.account.stocks.values():
-                cur_price = self.app.get_current_price(code= stock.code)
-                if cur_price <= stock.get_stoploss():
-                    pass
+                if not stock.closed: remain=True
+            if not remain:
+                CONFIG.logger.info(f"all stocks are closed. terminate program")
+                self.account.terminate()
+                self.app.terminate()
+                break
+            """
+                Price check
+            """    
+            self.account.periodic_bottom_update()
 
-            # chejan check
-            while self.app.chejan_arrived():
-                data = self.app.get_chejan()
+            """
+                Real data check (market start time only)
+            """
+            
+            """
+            Chejan check
 
+            ret["order_no"] = self.GetChejanData("9203").strip()
+            ret["code"] = self.GetChejanData("9201").strip()
+            ret["status"] = self.GetChejanData("913").strip() # "접수" or "체결"
+            ret["order_type"] = CONFIG.BUY if self.GetChejanData("905").strip() =="+" else CONFIG.SELL
+            ret["quan"] = int(self.GetChejanData("900").strip())
+            ret["remain_quan"] = int(self.GetChejanData("902").strip())
+            ret["price"] = int(self.GetChejanData("901").strip())
+            ret["limit"] = True if self.GetChejanData("906").strip() == "시장가" else False
+            ret["deal_quan"] = int(self.GetChejanData("911"))
+            """
+            while True:
+                data = self.app.get_chejan(); 
+                if data is None: break
+
+                CONFIG.logger.info(f"""{data['order_no']}({data['origin_order_no']}), code({data['code']}) : {data['order_type']} {data['status']},  ({data['quan']}, {data['deal_quan']}, {data['remain_quan']} left), {data['price']} won. (monitor arrived)""")
+                
+                # 1. 체결
                 if data["status"] == "체결":
-                    if data["remain_quan"] == 0: 
-                        self.account.delete_order(order_no=data["order_no"], code=data["code"])
-                    else:
-                        self.account.update_order(order_no=data["order_no"], remain_quan = data["remain_quan"])
+                    self.account.update_order(code=data["code"], 
+                                                ordno=data["order_no"], 
+                                                remained_quan=data["remain_quan"], 
+                                                deal_quan=data["deal_quan"],
+                                                buy= True if data["order_type"]=="+매수" else False)
+                # 2. 접수
                 elif data["status"] == "접수": # "접수"
-                    if data["limit"] == False: continue
+                    if data["remain_quan"] == 0 or data["order_type"] == "매수취소" or data["order_type"] == "매도취소": # 취소 후 온 더미 주문
+                        continue
+
+                    order_type = data["order_type"]
+                    if order_type not in ["-매도", "+매수"]: 
+                        CONFIG.logger.info(f"check this order type : {order_type}")
+                        continue
+
                     order = Order(app=self.app, 
                                 code = data["code"], 
-                                order_type= data["order_type"], 
+                                order_type= data["order_type"]=="+매수", 
                                 order_no= data["order_no"],
-                                limit=data["limit"],
                                 quantity = data["quan"],
                                 price = data["price"])
                     self.account.add_order(order=order)
+                    CONFIG.logger.info(f"{str(order)} created")
+
+                # 3. 확인 (주로 취소 후)    
+                elif data["status"] == "확인":
+                    order_type = data["order_type"]
+                    if order_type == "매수취소" or order_type == "매도취소":
+                        self.account.delete_order(order_no = data["origin_order_no"], code=data["code"], buy=data["order_type"] == "매수취소")
+                        CONFIG.logger.info(f"{data['origin_order_no']} order canceled.")
                 else: # another type?
-                    print(data["status"], end="arrived\n")
+                    CONFIG.logger.info(f"{data['status']}arrived")
 
-            # bottom & selling order update        
-            if cnt%50 == 0:
-                cnt = 1
-                self.account.periodic_bottom_update()
-                
+            """
+                12 check
+            """
+            # if not self.noon and datetime.datetime.now().hour >= 12:
+            #     CONFIG.logger.info("close all buy order at 12:00")
+            #     self.account.close_buy()
+            #     self.noon = True
 
+            """
+                get some rest 
+            """
+            time.sleep(self.sleep_time)
 
-            time.sleep(2)
+        CONFIG.logger.info("monitor stops.")
+
+            

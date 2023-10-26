@@ -1,26 +1,50 @@
-from Kiwoom.API.kiwoom import Kiwoom
-from Kiwoom.kiwoom_impl import *
+from App.Kiwoom.API.kiwoom import Kiwoom
+from App.Kiwoom.kiwoom_impl import *
 import config.config as CONFIG
 import config.code as CODE
 from tool.tools import *
 from App.App import App
-import time
-
+import time, threading
 import multiprocessing as mp
 import sys, datetime, os
 from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 import pandas as pd
-from Kiwoom.API.proxy import KiwoomProxy
-
+from App.Kiwoom.API.proxy import KiwoomProxy
 
 
 
 
 class KApp(App):
-    def __init__(self, daemon=True):
 
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            print("__new__ is called (KApp).")
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+
+
+    
+    def __init__(self, daemon=True, wait=CONFIG.WAIT):
+        
+        # singleton
+        cls = type(self)
+        if hasattr(cls, "_init"):
+            print("recycled\n (KApp).")
+            return
+        self._init = True
+
+        ##########    
+        self.tr_lock = threading.Lock() 
+        self.method_lock = threading.Lock()
+        self.real_lock = threading.Lock()
         self.accno = CONFIG.ACCNO
+
+        self.market_open = False if wait else True
+        self.market_close = False
 
         # SubProcess
         # method queue
@@ -37,7 +61,7 @@ class KApp(App):
 
         # real queue
         self.real_cqueue        = mp.Queue()
-        self.real_dqueues       = mp.Queue()
+        self.real_dqueue       = mp.Queue()
 
         # condition queue
         self.cond_cqueue        = mp.Queue()
@@ -64,7 +88,7 @@ class KApp(App):
                 self.order_dqueue,
                 # real queue
                 self.real_cqueue,
-                self.real_dqueues,
+                self.real_dqueue,
                 # condition queue
                 self.cond_cqueue,
                 self.cond_dqueue,
@@ -93,30 +117,45 @@ class KApp(App):
     """ 
         APP
     """
+    def terminate(self):
+        self.proxy.terminate()
+        CONFIG.logger.info("Kiwoom app is terminated.")
+
     def buy(self, code: str, limit: bool, price: int, quantity: int, ord_no: str = "") -> (str, str):
-        return self.put_order(make_param(order_type=CONFIG.BUY, code=code, accno=self.accno, 
-                          quantity=quantity, limit=limit, price=price, order_no=ord_no))
-        
-        return err_code
+        cmd = make_param(order_type=CONFIG.BUY, code=code, accno=self.accno, 
+                          quantity=quantity, limit=limit, price=cal_price(price), order_no=ord_no)
+        CONFIG.logger.info(f"order sent to the server : {cmd}")
+        return self.put_order(cmd=cmd)
             
         
     def sell(self, code: str, limit: bool, price: int, quantity: int, ord_no: str = "") -> (str, str):
-        return self.put_order(make_param(order_type=CONFIG.SELL, code=code, accno=self.accno, 
-                          quantity=quantity, limit=limit, price=price, order_no=ord_no))
+        cmd = make_param(order_type=CONFIG.SELL, code=code, accno=self.accno, 
+                          quantity=quantity, limit=limit, price=cal_price(price), order_no=ord_no)
+        CONFIG.logger.info(f"order sent to the server : {cmd}")
+        return self.put_order(cmd =cmd)
 
         
     def buy_cancle(self, code: str, quantity: int, ord_no: str) -> (str, str):
-        return self.put_order(make_param(order_type=CONFIG.BUY_CANCLE, code=code, accno=self.accno, 
-                          quantity=quantity, limit=True, price=0, order_no=ord_no))
+        cmd = make_param(order_type=CONFIG.BUY_CANCLE, code=code, accno=self.accno, 
+                          quantity=quantity, limit=True, price=0, order_no=ord_no)
+        CONFIG.logger.info(f"order sent to the server : {cmd}")
+        return self.put_order(cmd = cmd)
 
     
     def sell_cancle(self, code: str, quantity: int, ord_no: str) -> (str, str):
-        return self.put_order(make_param(order_type=CONFIG.SELL_CANCLE, code=code, accno=self.accno, 
-                          quantity=quantity, limit=True, price=0, order_no=ord_no))
+        cmd = make_param(order_type=CONFIG.SELL_CANCLE, code=code, accno=self.accno, 
+                          quantity=quantity, limit=True, price=0, order_no=ord_no)
+        CONFIG.logger.info(f"order sent to the server : {cmd}")
+        return self.put_order(cmd = cmd)
 
-    
+    """
+        TR
+    """
+
+
     def get_open_price(self, code:str) -> int:
-        self.put_tr(cmd = make_tr_param(
+
+        df = self.tr_waiting(cmd = make_tr_param(
             trcode  = CODE.TR_CURRENT_PRICE,
             rqname  = "cur_price",
             next    = '0',
@@ -125,16 +164,15 @@ class KApp(App):
             output  = ['시가']
         ))
 
-        while self.tr_dqueue.empty() : pass
-        df, _ = self.get_tr()
-
         cur_price = df['시가'][0]
         return abs(int(cur_price))
     
     def get_current_price(self, code: str) -> int:
-        if code in self.price_monitor: return self.price_monitor[code]
+        if code in self.price_monitor: 
+            return self.price_monitor[code]
 
-        self.put_tr(cmd = make_tr_param(
+        CONFIG.logger.info("price monitor not connected. (get_current_price called)")
+        df = self.tr_waiting(cmd = make_tr_param(
             trcode  = CODE.TR_CURRENT_PRICE,
             rqname  = "cur_price",
             next    = '0',
@@ -142,16 +180,13 @@ class KApp(App):
             input   = {'종목코드' : code},
             output  = ['현재가']
         ))
-        
-        while self.tr_dqueue.empty() : pass
-        df, _ = self.get_tr()
-
         cur_price = df['현재가'][0]
         return abs(int(cur_price))
 
     def get_day_chart(self, code: str, criterion_day = datetime.date.today().strftime("%Y%m%d"),
                       columns = [], size:int=20) -> pd.DataFrame:
-        self.put_tr(cmd = make_tr_param(
+        
+        df = self.tr_waiting(cmd = make_tr_param(
             trcode  = CODE.TR_DAY_CHART,
             rqname  = f"{code} day chart",
             next    = '0',
@@ -159,9 +194,6 @@ class KApp(App):
             input   = {'종목코드' : code, '조회일자' : criterion_day, '수정주가구분' : '1'},
             output  = ['일자', '시가', '현재가', '저가', '고가', '거래량']
         ))
-        while self.tr_dqueue.empty() : pass
-        df, _ = self.get_tr()
-
         df = df.head(size)
         df.rename(columns={
             '일자' : 'trade_time',
@@ -179,7 +211,7 @@ class KApp(App):
 
     def get_minute_chart(self, code:str, tick_size:int = 1, columns:list=[], size:int=20) -> pd.DataFrame:
 
-        self.put_tr(cmd = make_tr_param(
+        df = self.tr_waiting(cmd = make_tr_param(
             trcode  = CODE.TR_MINUTE_CHART,
             rqname  = f"{code} MINUTE chart",
             next    = '0',
@@ -187,9 +219,6 @@ class KApp(App):
             input   = {'종목코드' : code, '틱범위' : tick_size, '수정주가구분' : '1'},
             output  = ['체결시간', '시가', '현재가', '저가', '고가', '거래량']
         ))
-        while self.tr_dqueue.empty() : pass
-        df, _ = self.get_tr()
-
 
         df = df.head(size)
         df.rename(columns={
@@ -207,17 +236,15 @@ class KApp(App):
     
     def get_deposit(self) -> int:
 
-        self.put_tr(cmd = make_tr_param(
+        df = self.tr_waiting(cmd = make_tr_param(
             trcode = CODE.TR_DEPOSIT,
             rqname = "deposit tr",
             next = '0',
             screen =CODE.SCR_TR,
             input = {"계좌번호" : self.accno},
             output= ['예수금']
-        ))
-        while self.tr_dqueue.empty() : pass
-        df, _ = self.get_tr()
-        
+        ))    
+       
         return abs(int(df['예수금'][0]))
     
 
@@ -226,27 +253,15 @@ class KApp(App):
             종목번호 / 종목명 / 평가손익 / 수익률(%) /  보유수량 / 매입가 / 
             현재가 / 매입금액 / 평가금액 / 보유비중(%)
         """
-
-        ret = []
-        cmd = make_tr_param(
+        ret = self.tr_waiting(cmd=make_tr_param(
             trcode = CODE.TR_ACCOUNT,
             rqname = "account info tr",
             next = '0',
             screen = CODE.SCR_TR,
             input = {"계좌번호" : self.accno},
             output = CONFIG.STOCK_COLUMNS + ['종목번호']
-        )
-        
+        ), multi=True)
 
-        while True:
-            self.put_tr(cmd = cmd)
-            while self.tr_dqueue.empty(): pass
-            df, remained = self.get_tr()
-            ret.append(df)
-
-            if remained: cmd['next'] = '2'
-            else: break
-        
         ret = pd.concat(ret)
         ret.set_index('종목번호', inplace=True)
         ret.sort_values(by='평가금액', inplace=True)
@@ -260,20 +275,10 @@ class KApp(App):
         ret = ret.astype({col:'float' for col in ratio_col})
         return ret
 
-    
-
-
-    def get_stock_name(self, code:str) -> str:
-
-        self.put_method(('GetMasterCodeName', code))
-        while self.method_dqueue.empty(): pass
-        ret = self.get_method()
-        return ret
-
     def get_account_eval(self)->pd.DataFrame:
         korean_cols = ['총매입금액', '총평가금액', '총평가손익금액', '총수익률(%)', '추정예탁자산']
 
-        self.put_tr(cmd = make_tr_param(
+        df = self.tr_waiting(cmd=make_tr_param(
             trcode= CODE.TR_ACCOUNT,
             rqname = 'account eval tr',
             next = '0',
@@ -281,9 +286,6 @@ class KApp(App):
             input = {'계좌번호' : self.accno},
             output = korean_cols
         ))
-
-        while self.tr_dqueue.empty() : pass
-        df, _ = self.get_tr()
 
         df.rename( {
             k:v for k,v in zip(korean_cols, CONFIG.ACCOUNT_COLUMNS)
@@ -294,24 +296,110 @@ class KApp(App):
         df['total_earin'] = df['총수익률(%)'].astype(float)
         return df
     
-    def subscribe(self, code_list:[str]):
+    def tr_waiting(self, cmd:dict, multi:bool=False):
+        """
+            return data
+            multi -> [data1, data2, ..]
+        """
+        ret = None
+        with self.tr_lock:
+            if multi:
+                ret = []
+                while True:
+                    self.put_tr(cmd = cmd)
+                    while self.tr_dqueue.empty(): pass
+                    df, remained = self.get_tr()
+                    ret.append(df)
 
-        for code in code_list: 
+                    if remained: cmd['next'] = '2'
+                    else: break
+
+            else:
+                self.put_tr(cmd=cmd)
+                while self.tr_dqueue.empty(): pass
+                ret,_ = self.get_tr()
+        return ret
+    """
+        Real
+    """
+    
+    def subscribe(self, code_list:[str]):
+        prev_code_list = self.price_monitor.keys()
+        new_codes = list(set(prev_code_list + code_list))
+        for code in new_codes: 
             self.price_monitor[code] = self.get_current_price(code)
+            
+        self.put_real(cmd = make_real_param(
+            real_type='주식우선호가',
+            subscribe=True,
+            code_list=new_codes,
+            fid_list=['27', '28'],
+        ))
+        CONFIG.logger.info(f"{new_codes} subscribe request are sent. price_monitor : {self.price_monitor}")
+
+    def unsubscribe(self, code_list: [str]):
+        prev_code_list = self.price_monitor.keys()
+
+        new_codes = [item for item in prev_code_list if item not in code_list]
         self.put_real(cmd = make_real_param(
             real_type='주식체결',
             subscribe=True,
-            code_list=code_list,
+            code_list=new_codes,
             fid_list=['10'],
         ))
+        for code in code_list: 
+            self.price_monitor.pop(code, "default")
+        CONFIG.logger.info(f"{code_list} unsubscribe request are sent.")
+
+    def is_market_open(self)-> bool:
+        if self.market_open: return self.market_open
+
+        if 9 <= datetime.datetime.now().hour:
+            self.market_open = True
+            return True
+        else:
+            return False
+    
+    def is_market_close(self) -> bool:
+        if self.market_close: return self.market_close
+
+        now = datetime.datetime.now().time()
+        if now >= datetime.time(15, 30) or now <= datetime.time(9,00):
+            self.market_close=True
+            return True
+        else:
+            return False
 
     
+    def real_waiting(self): pass
 
+    def get_chejan(self):
+        if self.chejan_dqueue.empty():
+            return None
+        else:
+            return self.chejan_dqueue.get()
+    
     """
-        tools
+        Method
     """
     
-   
+    def get_stock_name(self, code:str) -> str:
+        return self.method_waiting(func_name='GetMasterCodeName', code=code)
+
+    def method_waiting(self, func_name:str, code:str):
+        ret = None
+        with self.method_lock:
+            self.put_method((func_name, code))
+            while self.method_dqueue.empty(): pass
+            ret = self.get_method()
+        return ret
+
+
+
+    """
+        Tool
+    """
+
     
     # method
     def put_method(self, cmd):
@@ -339,10 +427,10 @@ class KApp(App):
         self.real_cqueue.put(cmd)
 
     def real_arrived(self):
-        return not self.real_dqueues.empty()
+        return not self.real_dqueue.empty()
     
     def get_real(self):
-        return self.real_dqueues.get()
+        return self.real_dqueue.get()
 
     # condition
     def put_cond(self, cmd):
@@ -356,14 +444,9 @@ class KApp(App):
         else:
             return self.tr_cond_dqueue.get()
 
-    def get_chejan(self):
-        if self.chejan_dqueue.empty():
-            return False
-        else:
-            return self.chejan_dqueue.get()
+
         
-    def chejan_arrived(self):
-        return False if self.chejan_dqueue.empty() else True
+
 
 
 

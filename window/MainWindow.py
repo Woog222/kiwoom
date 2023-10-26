@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5 import uic
 import config.config as CONFIG
-from Kiwoom.KApp import KApp
 from tool.tools import *
 from method1.account import Account
 from App.App import App
@@ -13,13 +12,13 @@ from method1.monitor import Monitor
 form_class = uic.loadUiType(CONFIG.WINDOW_UI_DIR)[0]
 
 class MainWindow(QMainWindow, form_class):
-    def __init__(self, app:App, account:Account):
+    def __init__(self, app:App, account:Account, monitor:Monitor):
         super().__init__()
         
         self.setupUi(self)
         self.app = app
         self.account = account
-        self.monitor = Monitor(app=self.app, account=self.account, wait=False)
+        self.monitor = monitor
         self.monitor.start()
 
         # timer
@@ -35,10 +34,15 @@ class MainWindow(QMainWindow, form_class):
     def set_handler(self):
         self.timer.timeout.connect(self.timeout)
         self.check_button.clicked.connect(self.show_balance)
+        self.quit_button.clicked.connect(QApplication.quit)
+        
 
     """
         Handlers
     """
+
+    def show_stockText(self):
+        self.stockText.setPlainText(str(self.account))
 
     def show_interest_stocks(self):
         self.interest_table.setRowCount(len(self.account.stocks))
@@ -83,7 +87,6 @@ class MainWindow(QMainWindow, form_class):
         ['종목명', '평가손익', '수익률(%)', '보유수량', 
         '매입가', '현재가', '매입금액', '평가금액', '보유비중(%)']
         """
-
         df = self.app.get_stock_eval()
 
         row_cnt = df.shape[0]
@@ -102,7 +105,7 @@ class MainWindow(QMainWindow, form_class):
     def show_balance(self):
         self.show_account_eval()
         self.show_stock_eval()
-        self.show_interest_stocks()
+        self.show_stockText()
 
     def timeout(self):
         if self.real_time_button.isChecked():
