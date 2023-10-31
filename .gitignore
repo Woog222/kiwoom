@@ -5,4 +5,5 @@ result/*
 __pycache__/
 
 !data/.gitkeep
+!data/window.ui
 !result/.gitkeep
