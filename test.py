@@ -5,7 +5,6 @@ import config.code as CODE
 import pythoncom
 from App.Kiwoom.KApp import KApp
 from window.MainWindow import MainWindow
-from pykiwoom.kiwoom import *
 import datetime, time
 
 from multiprocessing import Process, Manager
