@@ -188,7 +188,6 @@ class Stock:
         """
             running!
         """
-        self.app.buy(code=self.code, limit=True, price = 8850, quantity=10)
         # 0. bottom = open_price & 3 5 7 price
         self.open_price = self.bottom = self.app.get_open_price(code=self.code)
         for i in [3,5,7]: self.price357[i] = cal_price(int(self.bottom * (1+0.01*i)))
