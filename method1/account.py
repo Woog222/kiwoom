@@ -3,6 +3,7 @@ from method1.stock import Stock
 import config.config as CONFIG
 from method1.order import Order
 import pandas as pd 
+import time
 
 
 class Account:
@@ -87,6 +88,7 @@ class Account:
                     self.stocks[code].sell_orders[spot] = None
 
     def start(self):
+        time.sleep(3)
         for stock in self.stocks.values(): stock.start()
         CONFIG.logger.info("account started.")
 
