@@ -66,7 +66,7 @@ def round_tick_size(price:int)->int:
         elif price <700000: return 10000
         else              : return 20000
 
-def cal_price(price:int):
+def cal_price(price:int)->int:
     """
         return the nearest hoga
     """
@@ -74,7 +74,7 @@ def cal_price(price:int):
     r = price % tick
     left = price - r
     right = left + tick
-    return left if abs(price-left) <= abs(price-right) else right 
+    return int(left) if abs(price-left) <= abs(price-right) else int(right) 
 
 def cal_round_figure(price:int, buy:bool):
     """

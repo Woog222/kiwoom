@@ -20,9 +20,13 @@ class Stock:
 
         self.assigned_quan = int(assigned_quan)
         self.day_chart = self.app.get_day_chart(code=self.code, columns=['open_price','last_price'], size=20)
+
         self.supRes = supRes
         self.body = cal_body(open_price=self.day_chart.loc[0, 'open_price'], last_price = self.day_chart.loc[0,'last_price']) \
             if len(body) < 5 else body
+        
+        print(f"body : {self.body}")
+        print(f"day_chart_yesterday : {self.day_chart.loc[0,:]}")
         self.avg_prices = {day : cal_avg_price(day_chart=self.day_chart, day=day) for day in [5,7,10,15,20]}
         self.open_price = -1 # at start!
         
