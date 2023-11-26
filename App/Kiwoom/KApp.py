@@ -195,6 +195,12 @@ class KApp(App):
             output  = ['일자', '시가', '현재가', '저가', '고가', '거래량']
         ))
         df = df.head(size)
+        print("before resetting" )
+        print(df.head())
+        df = df.reset_index()
+        print("after index reset : ")
+        print(df.head())
+
         df.rename(columns={
             '일자' : 'trade_time',
             '시가' : 'open_price',
@@ -221,6 +227,7 @@ class KApp(App):
         ))
 
         df = df.head(size)
+        df = df.reset_index()
         df.rename(columns={
             '체결시간' : 'trade_time',
             '시가' : 'open_price',
