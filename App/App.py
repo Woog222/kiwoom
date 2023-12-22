@@ -41,6 +41,11 @@ class App(metaclass = ABCMeta):
         pass
 
     @abstractmethod
+    def get_stock_shareheld(self, code:str)-> int:
+        pass
+    
+        
+    @abstractmethod
     def get_account_eval(self)->pd.DataFrame:
         """
         ['총매입금액', '총평가금액', '총평가손익금액', '총수익률(%)', '추정예탁자산']
@@ -55,12 +60,6 @@ class App(metaclass = ABCMeta):
     def is_market_open(self)-> bool: 
         """
             whether market is available or ,,
-        """
-        pass
-    @abstractmethod
-    def is_market_close(self)->bool:
-        """
-            when your program have to stop
         """
         pass
 

@@ -1,15 +1,17 @@
-from Kiwoom.KApp import App, MyWindow
-from PyQt5.QtWidgets import *
-from PyQt5.QAxContainer import *
+import time
 import sys
-import win32gui, win32con, win32api
+
+def loading_icon():
+    chars = ["|", "/", "-", "\\"]
+    delay = 0.1
+
+    for _ in range(20):  # Repeat for a certain number of iterations
+        for char in chars:
+            sys.stdout.write("\rLoading " + char)
+            sys.stdout.flush()
+            time.sleep(delay)
+
+    sys.stdout.write("\rLoading Complete!\n")
 
 if __name__ == "__main__":
-    # app = QApplication(sys.argv)
-    # window = MyWindow()
-    # window.show()
-    # app.exec_()    
-    app = App()
-    app.buy_stock(code ="005930", quantity=10, limit=False)
-    #app.sell_stock(code="005930", quantity=10, limit=False)
-
+    loading_icon()

@@ -4,27 +4,25 @@ from datetime import datetime
 
 ############# CONFIG ####################
 
-
-
 # True  : 08:30 ~ 09:00
 # False : market time
-WAIT = True # wait for market to open
-
+WAIT = False # wait for market to open
 
 ########################################
+TODAY_DATE = datetime.now().strftime("%Y%m%d")
 
 # Configure the logging settings
 logging.basicConfig(
     level=logging.DEBUG,  # Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename=os.path.join("result", f"{datetime.now().time().strftime('%H%M')}.txt"),  # Log file name
+    filename=os.path.join("result", f"{datetime.now().strftime('%m%d')}-{datetime.now().time().strftime('%H%M%S')}.txt"),  # Log file name
     filemode='w'  # Log file mode ('w' for write, 'a' for append)
 )
 
 # Create a logger object
 logger = logging.getLogger('my_logger')
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)  # Set the desired logging level
+console_handler.setLevel(logging.INFO)  # Set the desired logging level
 logger.addHandler(console_handler)
 
 SETTING_DTYPE = {
@@ -34,9 +32,7 @@ SETTING_DTYPE = {
     'body' : str,
     'supRes' : str,
     'quan' : int,
-    'assigned_quan' : int,
-    'sold' : int,
-    'order' : str
+    'assigned_quan' : int
 }
 SEP = '|'
 
@@ -55,9 +51,7 @@ LIMIT_ORDER = "00"
 MARKET_ORDER = "03"
 
 
-ALLTIME_ACCNO = "8057177211"
-DAE_ACCNO = "8057177311"
-FUTURE_OPTION_ACCNO = "7016014631"
+ALLTIME_ACCNO = "8064865811"
 ACCNO = ALLTIME_ACCNO # target account
 
 

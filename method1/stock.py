@@ -1,11 +1,12 @@
 from App.App import App
 from tool.tools import *
 import config.config as CONFIG
+import time
 
 class Stock:
 
     def __init__(self, app:App, code:str, supRes:[int], stage:int, buy:bool, shareHeld:int, stoploss:int,
-                 assigned_quan:int, sold:bool, body:[int], sell_orders:dict = {3:None, 5:None, 7:None}) -> None:
+                 assigned_quan:int, body:[int], sell_orders:dict = {3:None, 5:None, 7:None}) -> None:
         """
             supRes : descending order list
             shareHeld : holding stock size
@@ -19,14 +20,13 @@ class Stock:
         self.name = str(app.get_stock_name(code=code))
 
         self.assigned_quan = int(assigned_quan)
-        self.day_chart = self.app.get_day_chart(code=self.code, columns=['open_price','last_price'], size=20)
-
+        self.day_chart = self.app.get_day_chart(code=self.code, columns=['trade_time','open_price','last_price'], size=30)
         self.supRes = supRes
         self.body = cal_body(open_price=self.day_chart.loc[0, 'open_price'], last_price = self.day_chart.loc[0,'last_price']) \
-            if len(body) < 5 else body
+            if len(body) < 5 else body 
         
-        print(f"body : {self.body}")
-        print(f"day_chart_yesterday : {self.day_chart.loc[0,:]}")
+        print(f"\tbody : {self.body}")
+        print(f"\tday_chart : \n{self.day_chart.head(5)}\n\n")
         self.avg_prices = {day : cal_avg_price(day_chart=self.day_chart, day=day) for day in [5,7,10,15,20]}
         self.open_price = -1 # at start!
         
@@ -36,7 +36,6 @@ class Stock:
         """
         self.stage = stage
         self.buy = buy
-        self.sold = sold
         self.bottom = -1 # start with buy price, updated every minute
         self.price357 = {3:-1, 5:-1, 7:-1}
         if stage == 1: self.stoploss = cal_round_figure(price= self.avg_prices[5], buy=False)
@@ -46,34 +45,24 @@ class Stock:
         self.shareHeld = shareHeld
 
         self.buy_orders = {}  # {ordno : Order} after market
-        self.sell_orders = sell_orders # {357 : Order} after market
+        self.sell_orders = {3: None, 5:None, 7:None}
         self.closed=False
 
-    def __str__(self): 
-        """
-            state / current_price / bottom / stoploss / assigned_amount  
-        """
-        sb = [self.name,
-            str(self.stage) + str(self.buy), 
-            str(self.app.get_current_price(code=self.code)), 
-            str(self.bottom),
-            str(self.stoploss),
-            str(self.shareHeld) + " now",
-            str(self.assigned_quan) + " assigned",
-            str(self.body),
-            str(self.supRes),
-            CONFIG.SEP.join([str(order) for order in self.buy_orders.values()]),
-            CONFIG.SEP.join([str(order) for order in self.sell_orders.values()])
-        ]
-        
-        return "  ||  ".join(sb)
+
+    def update_shareHeld(self):
+        if self.closed: return
+        temp = self.app.get_stock_shareheld(code=self.code)
+        if temp != self.shareHeld: 
+            CONFIG.info(f"{self.code} shareHeld {self.shareHeld}, but {temp} received.")
+        self.shareHeld = temp
 
     def update_order(self, ordno:str, remained_quan:int, deal_quan:int, buy:bool):
-
+        if self.closed: return
         # REMAINING STOCKS EXIST
         if remained_quan > 0:
             if buy:
                 self.shareHeld += deal_quan
+                self.update_shareHeld()
                 for order_no, order in self.buy_orders.items():
                     if order_no == ordno:
                         log_str = f"buy order updated {str(order)} -> "
@@ -81,6 +70,7 @@ class Stock:
                         CONFIG.logger.info(f"{log_str}{str(order)}")
             else: # sell
                 self.shareHeld -= deal_quan
+                self.update_shareHeld()
                 for spot, order in self.sell_orders.items():
                     if order.order_no == ordno:
                         log_str = f"sell order updated {str(order)} -> "
@@ -91,6 +81,7 @@ class Stock:
         # close buy order
         if buy:
             self.shareHeld += deal_quan
+            self.update_shareHeld()
             
             target_orderno = None
             for order_no, order in self.buy_orders.items():
@@ -109,7 +100,7 @@ class Stock:
             # close selling order
             done = False
             self.shareHeld -= deal_quan
-            self.sold=True
+            self.update_shareHeld()
             target_orderno = None
 
             for spot, order in self.sell_orders.items():
@@ -138,7 +129,7 @@ class Stock:
             every 1 minute
             3,5,7 update
         """
-        if self.sold or self.bottom <= cur_price: return
+        if self.closed or self.buy or self.bottom <= cur_price: return
         CONFIG.logger.info(f"{self.code} bottom update : {self.bottom} -> {cur_price}")
         self.bottom = cur_price
         for i in [3,5,7]: self.price357[i] = cal_price(int(self.bottom * (1+i/100)))
@@ -162,6 +153,7 @@ class Stock:
             if order is not None: order.cancel()
         for order in self.sell_orders.values(): 
             if order is not None: order.cancel()
+        self.update_shareHeld()
 
         if self.shareHeld > 0: self.app.sell(code=self.code, limit=False, quantity = self.shareHeld, price=0)
         self.app.unsubscribe(code_list=[self.code])
@@ -193,7 +185,16 @@ class Stock:
             running!
         """
         # 0. bottom = open_price & 3 5 7 price
-        self.open_price = self.bottom = self.app.get_open_price(code=self.code)
+
+        CONFIG.logger.info(f"<{self.code} start>\n")
+
+        CONFIG.logger.info(f"waiting for open price..")
+
+        while True:
+            temp = self.app.get_open_price(code=self.code) 
+            if temp > 0: break
+            time.sleep(1)
+        self.open_price = self.bottom = temp
         for i in [3,5,7]: self.price357[i] = cal_price(int(self.bottom * (1+0.01*i)))
         CONFIG.logger.info(f"{self.code} open price(bottom) : {self.open_price}")
 
@@ -229,7 +230,10 @@ class Stock:
             elif self.avg_prices[5] < open_price <= last_price:
                 for cand in self.supRes + self.body:
                     if self.avg_prices[5] < cand <= last_price: 
+                        CONFIG.logger.info(f"stage 1, buy_price determined.")
                         return cand
+                CONFIG.logger.info(f"buy price")
+                return -1
             else:
                 # self.close_position()
                 return -1
@@ -255,3 +259,22 @@ class Stock:
             self.close_position()
             return
         self.update_bottom(cur_price=cur_price)
+
+    def __str__(self): 
+        """
+            state / current_price / bottom / stoploss / assigned_amount  
+        """
+        sb = [self.name,
+            str(self.stage) + str(self.buy), 
+            str(self.app.get_current_price(code=self.code)), 
+            str(self.bottom),
+            str(self.stoploss),
+            str(self.shareHeld) + " now",
+            str(self.assigned_quan) + " assigned",
+            str(self.body),
+            str(self.supRes),
+            CONFIG.SEP.join([str(order) for order in self.buy_orders.values()]),
+            CONFIG.SEP.join([str(order) for order in self.sell_orders.values()])
+        ]
+        
+        return "  ||  ".join(sb)

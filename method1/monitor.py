@@ -54,7 +54,7 @@ class Monitor(threading.Thread):
             """
                 market closed?
             """
-            if self.app.is_market_close():
+            if not self.app.is_market_open():
                 CONFIG.logger.info(f"market closed. terminate program")
                 self.account.terminate()
                 self.app.terminate()
@@ -78,24 +78,27 @@ class Monitor(threading.Thread):
             """
             
             """
-            Chejan check
-
+            status = self.GetChejanData("913").strip() # "접수" "체결" "확인"
+            ret = {}
             ret["order_no"] = self.GetChejanData("9203").strip()
-            ret["code"] = self.GetChejanData("9201").strip()
-            ret["status"] = self.GetChejanData("913").strip() # "접수" or "체결"
-            ret["order_type"] = CONFIG.BUY if self.GetChejanData("905").strip() =="+" else CONFIG.SELL
+            ret["code"] = self.GetChejanData("9001").strip().strip('A') # "A005930"
+            ret["status"] = self.GetChejanData("913").strip() # "접수" or "체결" or "확인"
+            ret["order_type"] = self.GetChejanData("905").strip() # "+매수" "매수취소"
             ret["quan"] = int(self.GetChejanData("900").strip())
             ret["remain_quan"] = int(self.GetChejanData("902").strip())
             ret["price"] = int(self.GetChejanData("901").strip())
-            ret["limit"] = True if self.GetChejanData("906").strip() == "시장가" else False
-            ret["deal_quan"] = int(self.GetChejanData("911"))
+            ret["origin_order_no"] = self.GetChejanData("904").strip()
+            ret["limit"] = self.GetChejanData("906").strip()=="보통" # "보통", "시장가"
+
+            deal_quan = self.GetChejanData("911").strip()
+            ret["deal_quan"] = 0 if deal_quan == '' else int(deal_quan)
             """
             while True:
                 data = self.app.get_chejan(); 
                 if data is None: break
 
-                CONFIG.logger.info(f"""{data['order_no']}({data['origin_order_no']}), code({data['code']}) : {data['order_type']} {data['status']},  ({data['quan']}, {data['deal_quan']}, {data['remain_quan']} left), {data['price']} won. (monitor arrived)""")
-                
+                CONFIG.logger.debug(f"""{data['order_no']}({data['origin_order_no']}), code({data['code']}) : {data['order_type']} {data['status']},  ({data['quan']}, {data['deal_quan']}, {data['remain_quan']} left), {data['price']} won. (monitor arrived)""")
+                CONFIG.logger.debug(f"{data} arrived.")
                 # 1. 체결
                 if data["status"] == "체결":
                     self.account.update_order(code=data["code"], 
@@ -120,14 +123,13 @@ class Monitor(threading.Thread):
                                 quantity = data["quan"],
                                 price = data["price"])
                     self.account.add_order(order=order)
-                    CONFIG.logger.info(f"{str(order)} created")
+                    
 
                 # 3. 확인 (주로 취소 후)    
                 elif data["status"] == "확인":
                     order_type = data["order_type"]
                     if order_type == "매수취소" or order_type == "매도취소":
                         self.account.delete_order(order_no = data["origin_order_no"], code=data["code"], buy=data["order_type"] == "매수취소")
-                        CONFIG.logger.info(f"{data['origin_order_no']} order canceled.")
                 else: # another type?
                     CONFIG.logger.info(f"{data['status']}arrived")
 

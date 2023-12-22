@@ -195,11 +195,6 @@ class KApp(App):
             output  = ['일자', '시가', '현재가', '저가', '고가', '거래량']
         ))
         df = df.head(size)
-        print("before resetting" )
-        print(df.head())
-        df = df.reset_index()
-        print("after index reset : ")
-        print(df.head())
 
         df.rename(columns={
             '일자' : 'trade_time',
@@ -212,6 +207,11 @@ class KApp(App):
         for num_col in CONFIG.CHART_NUM_COLUMNS:
             df[num_col] = df[num_col].astype(int)
             df[num_col] = df[num_col].apply(lambda x : abs(x))
+
+        condition = df['trade_time'] != CONFIG.TODAY_DATE
+        df = df[condition].reset_index(drop=True)
+
+
         return df if len(columns)==0 else df[columns]
 
 
@@ -254,6 +254,12 @@ class KApp(App):
        
         return abs(int(df['예수금'][0]))
     
+    def get_stock_shareheld(self, code:str) -> int:
+        df = self.get_stock_eval(self)
+        if code in df['종목번호']:
+            return int(df[code, '보유수량'])
+        else:
+            return 0
 
     def get_stock_eval(self) -> pd.DataFrame:
         """
@@ -359,23 +365,14 @@ class KApp(App):
         CONFIG.logger.info(f"{code_list} unsubscribe request are sent.")
 
     def is_market_open(self)-> bool:
-        if self.market_open: return self.market_open
-
-        if 9 <= datetime.datetime.now().hour:
-            self.market_open = True
-            return True
-        else:
-            return False
-    
-    def is_market_close(self) -> bool:
-        if self.market_close: return self.market_close
-
         now = datetime.datetime.now().time()
-        if now >= datetime.time(15, 30) or now <= datetime.time(9,00):
-            self.market_close=True
+
+        if  datetime.time(9,00) <= now and now <= datetime.time(15, 30):
             return True
         else:
             return False
+        
+
 
     
     def real_waiting(self): pass

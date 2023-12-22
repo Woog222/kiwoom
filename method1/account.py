@@ -22,7 +22,10 @@ class Account:
         """
 
         self.df = pd.read_csv(CONFIG.SETTING_DIR, dtype=CONFIG.SETTING_DTYPE, index_col='code')
+
+        CONFIG.logger.info(f"---------- Stock Info Loading -------------\n\n")
         for code in self.df.index:
+            CONFIG.logger.info(f"{code} :")
 
             state = self.df.loc[code, 'state'].split('|')
             stage = int(state[0]); buy = True if state[1]=='b' else False
@@ -31,17 +34,7 @@ class Account:
             supRes = list(map(int, self.df.loc[code, 'supRes'].split('|')))
             shareHeld = int(self.df.loc[code, 'quan'])
             assigned_quan = int(self.df.loc[code, 'assigned_quan'])
-            sold = True if self.df.loc[code, 'sold']==1 else False
 
-            order_strs = self.df.loc[code, 'order'].split(CONFIG.SEP)
-            sell_orders = {3:None, 5:None, 7:None}
-            for spot, order_str in zip([3,5,7], order_strs):
-                if order_str != 'None':
-                    order_no, code, order_type, price, quantity = order_str.split(';')
-                    sell_orders[spot] = \
-                        Order(app=self.app, code=code, order_no=order_no, order_type=CONFIG.BUY if order_type=='BUY' else CONFIG.SELL,
-                              quan=int(quantity), price=int(price))  
-            
             self.stocks[code] = Stock(
                 app = self.app,
                 code = code, 
@@ -50,10 +43,8 @@ class Account:
                 buy = buy,
                 shareHeld= shareHeld,
                 assigned_quan=assigned_quan,
-                sold=sold,
                 body=body,
                 stoploss = stoploss,
-                sell_orders=sell_orders
             )
 
         
@@ -79,6 +70,8 @@ class Account:
         self.stocks[code].update_order(ordno = ordno, remained_quan=remained_quan, deal_quan=deal_quan, buy=buy)
 
     def delete_order(self, code:str, order_no:str, buy:bool):
+
+        
         if buy:
             self.stocks[code].buy_orders.pop(order_no)
         else:
@@ -86,9 +79,10 @@ class Account:
                 if order is None: continue
                 if order.order_no == order_no:
                     self.stocks[code].sell_orders[spot] = None
+        CONFIG.info(f"{code} {'buy' if buy else 'sell'} order({order_no}) deleted.")
 
     def start(self):
-        time.sleep(3)
+        CONFIG.logger.info(f"\n\n----------------- start ------------------\n\n")
         for stock in self.stocks.values(): stock.start()
         CONFIG.logger.info("account started.")
 
@@ -104,8 +98,6 @@ class Account:
             self.df.loc[code, "supRes"] = sep.join([str(supRes) for supRes in stock.supRes])
             self.df.loc[code, "quan"] = stock.shareHeld
             self.df.loc[code, "assigned_quan"] = stock.assigned_quan
-            self.df.loc[code, "order"] = sep.join([str(order) for order in stock.sell_orders.values()])
-            self.df.loc[code, "sold"] = 1 if stock.sold else 0
         self.df.to_csv(CONFIG.SETTING_DIR)
 
     def __del__(self):
