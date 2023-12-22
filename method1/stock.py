@@ -186,7 +186,7 @@ class Stock:
         """
         # 0. bottom = open_price & 3 5 7 price
 
-        CONFIG.logger.info(f"<{self.code} start>\n")
+        CONFIG.logger.info(f"\n<{self.code} start>\n")
 
         CONFIG.logger.info(f"waiting for open price..")
 

@@ -82,12 +82,14 @@ class Account:
         CONFIG.info(f"{code} {'buy' if buy else 'sell'} order({order_no}) deleted.")
 
     def start(self):
-        CONFIG.logger.info(f"\n\n----------------- start ------------------\n\n")
-        for stock in self.stocks.values(): stock.start()
-        CONFIG.logger.info("account started.")
+        CONFIG.logger.info(f"\n----------------- start ------------------\n")
+        for stock in self.stocks.values(): 
+            stock.start()
+            
+        CONFIG.logger.info("account started.\n\n")
 
     def terminate(self):
-
+        
         self.terminated = True
         for stock in self.stocks.values():
             code = stock.code
@@ -99,6 +101,7 @@ class Account:
             self.df.loc[code, "quan"] = stock.shareHeld
             self.df.loc[code, "assigned_quan"] = stock.assigned_quan
         self.df.to_csv(CONFIG.SETTING_DIR)
+        CONFIG.logger.info("account terminated. df saved.")
 
     def __del__(self):
         if not self.terminated: self.terminate()

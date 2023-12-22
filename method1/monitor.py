@@ -96,9 +96,7 @@ class Monitor(threading.Thread):
             while True:
                 data = self.app.get_chejan(); 
                 if data is None: break
-
-                CONFIG.logger.debug(f"""{data['order_no']}({data['origin_order_no']}), code({data['code']}) : {data['order_type']} {data['status']},  ({data['quan']}, {data['deal_quan']}, {data['remain_quan']} left), {data['price']} won. (monitor arrived)""")
-                CONFIG.logger.debug(f"{data} arrived.")
+                CONFIG.logger.debug(f"{data} \narrived.")
                 # 1. 체결
                 if data["status"] == "체결":
                     self.account.update_order(code=data["code"], 
@@ -136,10 +134,10 @@ class Monitor(threading.Thread):
             """
                 12 check
             """
-            # if not self.noon and datetime.datetime.now().hour >= 12:
-            #     CONFIG.logger.info("close all buy order at 12:00")
-            #     self.account.close_buy()
-            #     self.noon = True
+            if not self.noon and datetime.datetime.now().hour >= 12:
+                CONFIG.logger.info("close all buy order at 12:00")
+                self.account.close_buy()
+                self.noon = True
 
             """
                 get some rest 
