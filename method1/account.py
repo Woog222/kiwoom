@@ -119,8 +119,19 @@ class Account:
             if stock.shareHeld== 0: stock.close_position()
 
 
-    def periodic_bottom_update(self):
+    def periodic_bottom_update(self) -> [str]:
+        """
+        
+        return : stock codes to be closed
+        """
+        ret = []
         for stock in self.stocks.values():
-            stock.check_price()
-
+            temp = stock.check_price()
+            if len() > 0:
+                ret.append(temp[0])
+        return ret
+    def close_stock(self, codes:[str]) -> None:
+        for stock in self.stocks:
+            if stock.code in codes:
+                stock.close_position()
 

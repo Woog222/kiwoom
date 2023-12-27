@@ -21,7 +21,7 @@ class Stock:
 
         self.assigned_quan = int(assigned_quan)
         self.day_chart = self.app.get_day_chart(code=self.code, columns=['trade_time','open_price','last_price'], size=30)
-        self.supRes = supRes
+        self.supRes = supRes if supRes[0] != -1 else []
         self.body = cal_body(open_price=self.day_chart.loc[0, 'open_price'], last_price = self.day_chart.loc[0,'last_price']) \
             if len(body) < 5 else body 
         
@@ -156,6 +156,7 @@ class Stock:
         self.update_shareHeld()
 
         if self.shareHeld > 0: self.app.sell(code=self.code, limit=False, quantity = self.shareHeld, price=0)
+        CONFIG.logger.info(f"{self.code} closed.\n")
         self.app.unsubscribe(code_list=[self.code])
 
     def check_fall_through(self):
@@ -250,15 +251,19 @@ class Stock:
     """
         just renewing bottom and check stoploss
     """
-    def check_price(self):
+    def check_price(self) -> [str]:
+        """
+            return : [code] if to be closed, or []
+        """
         if self.closed: return
         cur_price = self.app.get_current_price(code=self.code)
 
         if cur_price <= self.stoploss: 
-            CONFIG.logger.info(f"{self.code} price {cur_price} stoploss({self.stoploss}) touched. close position")
-            self.close_position()
-            return
+            #CONFIG.logger.info(f"{self.code} price {cur_price} stoploss({self.stoploss}) touched. close position")
+            #self.close_position()
+            return [self.code]
         self.update_bottom(cur_price=cur_price)
+        return []
 
     def __str__(self): 
         """

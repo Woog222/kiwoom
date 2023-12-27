@@ -6,7 +6,7 @@ from datetime import datetime
 
 # True  : 08:30 ~ 09:00
 # False : market time
-WAIT = False # wait for market to open
+WAIT = True # wait for market to open
 
 ########################################
 TODAY_DATE = datetime.now().strftime("%Y%m%d")
